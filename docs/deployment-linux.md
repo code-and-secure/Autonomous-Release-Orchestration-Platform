@@ -28,13 +28,11 @@ Check health:
 curl http://localhost:8080/health
 ```
 
-## 2) Build and push Docker image (GHCR)
+## 2) Build local Docker image
 
 ```bash
 cd ..
-docker build -f docker/Dockerfile -t ghcr.io/<your-username>/autonomous-release-platform:dev app
-docker login ghcr.io -u <your-username>
-docker push ghcr.io/<your-username>/autonomous-release-platform:dev
+docker build -f docker/Dockerfile -t local/autonomous-release-platform:dev app
 ```
 
 ## 3) Update manifests with your image
@@ -47,7 +45,7 @@ Update image path in:
 
 Use:
 
-- ghcr.io/<your-username>/autonomous-release-platform
+- local/autonomous-release-platform:dev
 
 ## 4) Create local Kubernetes cluster
 
@@ -55,6 +53,7 @@ Use:
 kind create cluster --name aro-platform
 kubectl create namespace dev
 kubectl create namespace prod
+kind load docker-image local/autonomous-release-platform:dev --name aro-platform
 ```
 
 ## 5) Deploy with Kustomize
@@ -112,3 +111,4 @@ chmod +x scripts/verify-release.sh scripts/rollback.sh
 
 3. Image pull error
 - Recheck image path and tag in overlays.
+- Re-run `kind load docker-image local/autonomous-release-platform:dev --name aro-platform` after rebuilding the image.

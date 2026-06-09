@@ -23,12 +23,11 @@ Health check:
 
 Stop container with Ctrl+C.
 
-## 2) Tag and push container image to registry
+## 2) Prepare image for local Kubernetes
 
 ```bash
-docker tag local/autonomous-release-platform:dev ghcr.io/<your-username>/autonomous-release-platform:dev
-docker login ghcr.io -u <your-username>
-docker push ghcr.io/<your-username>/autonomous-release-platform:dev
+kind create cluster --name aro-platform
+kind load docker-image local/autonomous-release-platform:dev --name aro-platform
 ```
 
 ## 3) Deploy that container image to Kubernetes
@@ -42,7 +41,6 @@ Update these files with your image path:
 Then deploy:
 
 ```bash
-kind create cluster --name aro-platform
 kubectl create namespace dev
 kubectl apply -k k8s/overlays/dev
 kubectl get pods -n dev
@@ -66,7 +64,7 @@ helm repo update
 helm upgrade --install monitor prometheus-community/kube-prometheus-stack -n monitoring --create-namespace -f monitoring/prometheus-values.yaml
 ```
 
-## 6) CI-friendly Dockerized commands
+## 6) Optional CI-friendly registry commands
 
 Use these in pipelines:
 
@@ -84,4 +82,5 @@ docker push ghcr.io/<your-username>/autonomous-release-platform:${GIT_SHA}
 - Update tag and re-apply overlay.
 
 3. Image pull backoff
-- Ensure pushed image is public or cluster has pull credentials.
+- Ensure manifests reference `local/autonomous-release-platform:dev` for local clusters.
+- Re-run `kind load docker-image local/autonomous-release-platform:dev --name aro-platform` after rebuilding.

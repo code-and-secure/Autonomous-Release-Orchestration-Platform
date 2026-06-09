@@ -25,13 +25,11 @@ Check health in browser:
 
 - http://localhost:8080/health
 
-## 2) Build and push Docker image (GHCR)
+## 2) Build local Docker image
 
 ```powershell
 Set-Location ..
-docker build -f docker/Dockerfile -t ghcr.io/<your-username>/autonomous-release-platform:dev app
-docker login ghcr.io -u <your-username>
-docker push ghcr.io/<your-username>/autonomous-release-platform:dev
+docker build -f docker/Dockerfile -t local/autonomous-release-platform:dev app
 ```
 
 ## 3) Update manifests with your image
@@ -44,7 +42,7 @@ Update image path in:
 
 Use:
 
-- ghcr.io/<your-username>/autonomous-release-platform
+- local/autonomous-release-platform:dev
 
 ## 4) Create local Kubernetes cluster
 
@@ -52,6 +50,7 @@ Use:
 kind create cluster --name aro-platform
 kubectl create namespace dev
 kubectl create namespace prod
+kind load docker-image local/autonomous-release-platform:dev --name aro-platform
 ```
 
 ## 5) Deploy with Kustomize
@@ -118,3 +117,7 @@ kubectl rollout status deployment prod-autonomous-release-app -n prod --timeout=
 
 3. Script files not executable
 - Use the PowerShell command equivalents shown above.
+
+4. Image pull backoff
+- Verify manifests use `local/autonomous-release-platform:dev`.
+- Re-run `kind load docker-image local/autonomous-release-platform:dev --name aro-platform` after each image rebuild.

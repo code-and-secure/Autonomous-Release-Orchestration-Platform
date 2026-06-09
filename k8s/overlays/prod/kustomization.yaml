@@ -5,8 +5,8 @@ resources:
 namePrefix: prod-
 namespace: prod
 images:
-  - name: ghcr.io/example-org/autonomous-release-platform
-    newTag: latest
+  - name: local/autonomous-release-platform
+    newTag: dev
 replicas:
   - name: autonomous-release-app
     count: 3
