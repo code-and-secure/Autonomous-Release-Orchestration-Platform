@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autonomous-release-app
+  labels:
+    app: autonomous-release-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: autonomous-release-app
+  template:
+    metadata:
+      labels:
+        app: autonomous-release-app
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/example-org/autonomous-release-platform:latest
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

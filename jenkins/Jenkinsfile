@@ -1,0 +1,56 @@
+pipeline {
+  agent any
+
+  environment {
+    IMAGE_NAME = "ghcr.io/${env.GITHUB_ORG}/autonomous-release-platform"
+    IMAGE_TAG = "${env.GIT_COMMIT}"
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Install') {
+      steps {
+        dir('app') {
+          sh 'npm ci'
+        }
+      }
+    }
+
+    stage('Test') {
+      steps {
+        dir('app') {
+          sh 'npm test'
+        }
+      }
+    }
+
+    stage('Build Image') {
+      steps {
+        sh 'docker build -f docker/Dockerfile -t ${IMAGE_NAME}:${IMAGE_TAG} app'
+      }
+    }
+
+    stage('Push Image') {
+      when {
+        branch 'main'
+      }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'ghcr-creds', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
+          sh 'echo ${REGISTRY_PASSWORD} | docker login ghcr.io -u ${REGISTRY_USER} --password-stdin'
+          sh 'docker push ${IMAGE_NAME}:${IMAGE_TAG}'
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo "Pipeline result: ${currentBuild.currentResult}"
+    }
+  }
+}

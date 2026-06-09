@@ -1,0 +1,14 @@
+{
+  "name": "autonomous-release-app",
+  "version": "1.0.0",
+  "description": "Sample service for autonomous release orchestration learning project",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

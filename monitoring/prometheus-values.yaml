@@ -1,0 +1,10 @@
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+grafana:
+  adminPassword: admin
+  defaultDashboardsEnabled: true
+
+alertmanager:
+  enabled: true

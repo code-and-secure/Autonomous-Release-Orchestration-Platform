@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+namePrefix: prod-
+namespace: prod
+images:
+  - name: ghcr.io/example-org/autonomous-release-platform
+    newTag: latest
+replicas:
+  - name: autonomous-release-app
+    count: 3
