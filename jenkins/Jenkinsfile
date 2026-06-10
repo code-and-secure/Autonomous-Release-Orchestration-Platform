@@ -44,7 +44,7 @@ pipeline {
           def onMainBranch = (env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'main' || env.GIT_BRANCH == 'origin/main')
           if (!onMainBranch) {
             def containsOriginMain = sh(
-              script: "git branch -r --contains HEAD | sed 's/^ *//' | grep -E '^origin/main$' >/dev/null && echo true || echo false",
+              script: '''git branch -r --contains HEAD | sed 's/^ *//' | grep -E '^origin/main$' >/dev/null && echo true || echo false''',
               returnStdout: true
             ).trim()
             onMainBranch = (containsOriginMain == 'true')
