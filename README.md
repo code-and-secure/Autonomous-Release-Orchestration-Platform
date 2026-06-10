@@ -113,6 +113,14 @@ For full flow with ArgoCD, monitoring, and rollback practice, use [docs/deployme
 4. Configure GitHub Secrets for Slack and registry authentication.
 5. Never commit passwords, kubeconfig, or tokens.
 
+## GHCR and Jenkins setup checklist
+
+1. Create a GitHub personal access token with `write:packages` and `read:packages` scopes.
+2. In Jenkins, add credential `ghcr-creds` (username: GitHub user/org owner, password: PAT).
+3. Ensure Jenkins can read your repository remote URL (`origin`) so `GITHUB_ORG` can be auto-detected.
+4. If auto-detection is not possible, set environment variable `GITHUB_ORG` in Jenkins job configuration.
+5. Update Kubernetes image names to `ghcr.io/<your-org>/autonomous-release-platform:<tag>` for cluster pulls.
+
 ## Learning milestones
 
 1. CI: push code, run tests, build image.
@@ -131,7 +139,7 @@ Use [docs/production-readiness-checklist.md](docs/production-readiness-checklist
 - Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - Security policy: [SECURITY.md](SECURITY.md)
 
-## Required secrets
+## Required secrets and credentials
 
 For GitHub Actions, configure repository secrets:
 
@@ -139,4 +147,9 @@ For GitHub Actions, configure repository secrets:
 - REGISTRY_PASSWORD
 - SLACK_WEBHOOK_URL
 
-For GitHub Container Registry (GHCR), you can use GITHUB_TOKEN with packages: write permission.
+For Jenkins, configure:
+
+- Credential ID `ghcr-creds` (GitHub username + PAT)
+- Optional environment variable `GITHUB_ORG` (if not inferable from git remote)
+
+For GitHub Container Registry (GHCR), you can use `GITHUB_TOKEN` with `packages: write` permission in GitHub Actions.

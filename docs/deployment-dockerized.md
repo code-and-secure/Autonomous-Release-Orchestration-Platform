@@ -73,6 +73,34 @@ docker build -f docker/Dockerfile -t ghcr.io/<your-username>/autonomous-release-
 docker push ghcr.io/<your-username>/autonomous-release-platform:${GIT_SHA}
 ```
 
+## 7) Jenkins + GHCR deployment path
+
+1. In Jenkins, configure credential `ghcr-creds` with:
+- Username: your GitHub username (or org owner user)
+- Password: GitHub PAT with `write:packages` and `read:packages`
+
+2. Run pipeline on `main` branch.
+- Jenkins builds image from `docker/Dockerfile`.
+- Jenkins pushes two tags to GHCR:
+	- commit SHA tag (for traceability)
+	- `latest` (for simple environments)
+
+3. Point Kubernetes manifests to GHCR image path:
+- `ghcr.io/<your-username-or-org>/autonomous-release-platform:<tag>`
+
+4. If your package is private, create image pull secret:
+
+```bash
+kubectl create secret docker-registry ghcr-creds \
+	--docker-server=ghcr.io \
+	--docker-username=<your-github-username> \
+	--docker-password=<your-github-pat> \
+	--docker-email=<your-email> \
+	-n dev
+```
+
+Attach secret in deployment service account or pod spec for each namespace.
+
 ## Troubleshooting
 
 1. Container starts but app not reachable
@@ -84,3 +112,8 @@ docker push ghcr.io/<your-username>/autonomous-release-platform:${GIT_SHA}
 3. Image pull backoff
 - Ensure manifests reference `local/autonomous-release-platform:dev` for local clusters.
 - Re-run `kind load docker-image local/autonomous-release-platform:dev --name aro-platform` after rebuilding.
+
+4. GHCR push fails in Jenkins
+- Verify Jenkins credential id is exactly `ghcr-creds`.
+- Confirm PAT has package scopes and SSO authorization (if org enforces SSO).
+- Confirm `GITHUB_ORG` resolves correctly in Jenkins logs.

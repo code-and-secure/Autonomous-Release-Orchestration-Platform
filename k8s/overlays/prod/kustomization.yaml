@@ -6,7 +6,7 @@ namePrefix: prod-
 namespace: prod
 images:
   - name: local/autonomous-release-platform
-    newTag: dev
+    newTag: prod
 replicas:
   - name: autonomous-release-app
     count: 3

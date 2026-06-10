@@ -2,8 +2,8 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_NAME = "ghcr.io/${env.GITHUB_ORG}/autonomous-release-platform"
-    IMAGE_TAG = "${env.GIT_COMMIT}"
+    REGISTRY = "ghcr.io"
+    IMAGE_REPO = "autonomous-release-platform"
   }
 
   stages {
@@ -21,6 +21,43 @@ pipeline {
       }
     }
 
+    stage('Prepare Image Metadata') {
+      steps {
+        script {
+          env.IMAGE_TAG = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
+
+          if (!env.GITHUB_ORG?.trim()) {
+            def remoteUrl = sh(script: 'git config --get remote.origin.url', returnStdout: true).trim()
+            def sshMatch = (remoteUrl =~ /github\.com:([^\/]+)\/.+/)
+            def httpsMatch = (remoteUrl =~ /github\.com\/([^\/]+)\/.+/)
+            if (sshMatch) {
+              env.GITHUB_ORG = sshMatch[0][1]
+            } else if (httpsMatch) {
+              env.GITHUB_ORG = httpsMatch[0][1]
+            }
+          }
+
+          if (!env.GITHUB_ORG?.trim()) {
+            error('GITHUB_ORG is not set and could not be inferred from git remote URL.')
+          }
+
+          def onMainBranch = (env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'main' || env.GIT_BRANCH == 'origin/main')
+          if (!onMainBranch) {
+            def containsOriginMain = sh(
+              script: "git branch -r --contains HEAD | sed 's/^ *//' | grep -E '^origin/main$' >/dev/null && echo true || echo false",
+              returnStdout: true
+            ).trim()
+            onMainBranch = (containsOriginMain == 'true')
+          }
+
+          env.IS_MAIN_BRANCH = onMainBranch ? 'true' : 'false'
+          env.IMAGE_NAME = "${env.REGISTRY}/${env.GITHUB_ORG}/${env.IMAGE_REPO}"
+          echo "Resolved image: ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+          echo "Branch context: BRANCH_NAME=${env.BRANCH_NAME}, GIT_BRANCH=${env.GIT_BRANCH}, IS_MAIN_BRANCH=${env.IS_MAIN_BRANCH}"
+        }
+      }
+    }
+
     stage('Test') {
       steps {
         dir('app') {
@@ -32,18 +69,28 @@ pipeline {
     stage('Build Image') {
       steps {
         sh 'docker build -f docker/Dockerfile -t ${IMAGE_NAME}:${IMAGE_TAG} app'
+        sh 'docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest'
       }
     }
 
     stage('Push Image') {
       when {
-        branch 'main'
+        expression {
+          return env.IS_MAIN_BRANCH == 'true'
+        }
       }
       steps {
         withCredentials([usernamePassword(credentialsId: 'ghcr-creds', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
           sh 'echo ${REGISTRY_PASSWORD} | docker login ghcr.io -u ${REGISTRY_USER} --password-stdin'
           sh 'docker push ${IMAGE_NAME}:${IMAGE_TAG}'
+          sh 'docker push ${IMAGE_NAME}:latest'
         }
+      }
+    }
+
+    stage('Cleanup Local Image') {
+      steps {
+        sh 'docker image rm ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest || true'
       }
     }
   }

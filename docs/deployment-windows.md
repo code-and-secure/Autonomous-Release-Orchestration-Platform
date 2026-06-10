@@ -107,6 +107,26 @@ kubectl rollout undo deployment prod-autonomous-release-app -n prod
 kubectl rollout status deployment prod-autonomous-release-app -n prod --timeout=120s
 ```
 
+## 9) GHCR for Jenkins-driven deployments
+
+If you deploy via Jenkins and GHCR instead of local images:
+
+1. Ensure Jenkins has credential `ghcr-creds` (GitHub username + PAT with package scopes).
+2. Push from Jenkins `main` branch pipeline to produce:
+- `ghcr.io/<your-org>/autonomous-release-platform:<commit-sha>`
+- `ghcr.io/<your-org>/autonomous-release-platform:latest`
+3. Update image references in Kubernetes overlays to GHCR.
+4. If repository package visibility is private, add pull secret in each namespace:
+
+```powershell
+kubectl create secret docker-registry ghcr-creds `
+	--docker-server=ghcr.io `
+	--docker-username=<your-github-username> `
+	--docker-password=<your-github-pat> `
+	--docker-email=<your-email> `
+	-n dev
+```
+
 ## Troubleshooting
 
 1. npm execution policy issue
@@ -121,3 +141,8 @@ kubectl rollout status deployment prod-autonomous-release-app -n prod --timeout=
 4. Image pull backoff
 - Verify manifests use `local/autonomous-release-platform:dev`.
 - Re-run `kind load docker-image local/autonomous-release-platform:dev --name aro-platform` after each image rebuild.
+
+5. GHCR image pull backoff
+- Verify image path and tag exist in GHCR.
+- Verify `ghcr-creds` secret exists in the target namespace.
+- Ensure PAT used for pull secret has package read access.
