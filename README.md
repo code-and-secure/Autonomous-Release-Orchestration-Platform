@@ -1,155 +1,154 @@
 # Autonomous Release Orchestration Platform
 
-![CI](https://img.shields.io/github/actions/workflow/status/YOUR_GITHUB_USERNAME/autonomous-release-orchestration-platform/ci.yml?branch=main&label=CI)
-![License](https://img.shields.io/github/license/YOUR_GITHUB_USERNAME/autonomous-release-orchestration-platform)
-![Stars](https://img.shields.io/github/stars/YOUR_GITHUB_USERNAME/autonomous-release-orchestration-platform?style=social)
+![CI](https://img.shields.io/github/actions/workflow/status/code-and-secure/Autonomous-Release-Orchestration-Platform/ci.yml?branch=main&label=CI)
+![License](https://img.shields.io/github/license/code-and-secure/Autonomous-Release-Orchestration-Platform)
+![Stars](https://img.shields.io/github/stars/code-and-secure/Autonomous-Release-Orchestration-Platform?style=social)
 
-A hands-on DevOps learning project that automatically takes application code from GitHub and safely deploys it to Kubernetes.
+A hands-on DevOps learning project that automatically takes application code from GitHub and safely deploys it to Kubernetes using GitHub Actions and ArgoCD.
 
-Replace YOUR_GITHUB_USERNAME in badge links after publishing the repository.
+---
 
-## Why this project exists
+## How it works
 
-If many developers push code every day, manual deployment does not scale.
-This project shows a safe, automated release flow that can be used by teams and also studied by beginners.
+1. You push code to `main` on GitHub.
+2. GitHub Actions runs tests, builds a Docker image, and pushes it to GHCR.
+3. GitHub Actions updates the Kubernetes manifest with the new image tag and commits it back to Git.
+4. ArgoCD detects the manifest change and syncs the cluster automatically.
+5. Kubernetes performs a zero-downtime rolling update.
 
-## How it works (simple)
+No manual `kubectl apply`. No SSH into servers. Git is the only source of truth.
 
-1. You push code to GitHub.
-2. CI (GitHub Actions or Jenkins) runs tests.
-3. If tests pass, a Docker image is built.
-4. The image is pushed to a container registry.
-5. ArgoCD watches the repo and applies Kubernetes manifests.
-6. Kubernetes rolls out the new version.
-7. Prometheus and Grafana help verify release health.
-8. Slack can notify the team about pipeline results.
+For a detailed explanation of every step, see [docs/how-it-works.md](docs/how-it-works.md).
+
+---
 
 ## End-to-end flow
 
 ```mermaid
 flowchart TD
-  A[Developer Push] --> B[GitHub]
-  B --> C[GitHub Actions or Jenkins]
-  C --> D[Build + Test]
-  D --> E[Docker Image Build]
-  E --> F[Push to Registry]
-  F --> G[ArgoCD]
-  G --> H[Kubernetes]
-  H --> I[Prometheus + Grafana Verification]
-  I --> J[Slack Notification]
+  A[Developer pushes to main] --> B[GitHub Actions]
+  B --> C[npm test]
+  C --> D[docker build + push to GHCR]
+  D --> E[Update kustomization.yaml image tag in Git]
+  E --> F[ArgoCD detects Git change]
+  F --> G[kubectl apply via Kustomize]
+  G --> H[Kubernetes rolling update]
+  H --> I[Healthy pods running in dev + prod]
 ```
 
-## Architecture image for public README
-
-You can keep the Mermaid diagram above or export it as a PNG and add it like this:
-
-```md
-![Architecture](docs/architecture.png)
-```
-
-After you add docs/architecture.png, paste the line above directly into this README.
-
-## What happens when you push to main
-
-- CI starts automatically.
-- The app is tested.
-- A new image is built and pushed.
-- ArgoCD syncs cluster state from Git.
-- New pods start with health checks.
-- If something is wrong, you can rollback quickly.
+---
 
 ## Repository layout
 
-- `.github/workflows`: CI pipelines (GitHub Actions)
-- `jenkins`: CI pipeline alternative (Jenkinsfile)
-- `app`: sample Node.js service with tests
-- `docker`: Docker image definition
-- `k8s`: Kubernetes manifests (base + overlays)
-- `argocd`: ArgoCD Application definitions
-- `monitoring`: Prometheus and Grafana starter config
-- `scripts`: release verification and rollback helpers
-- `docs`: setup and learning guides
+```
+.github/workflows/    GitHub Actions CI pipeline
+app/                  Node.js application and tests
+docker/               Dockerfile
+k8s/
+  base/               Shared Kubernetes manifests
+  overlays/dev/       Dev environment (1 replica, dev namespace)
+  overlays/prod/      Prod environment (3 replicas, prod namespace)
+argocd/               ArgoCD Application definitions
+monitoring/           Prometheus and Grafana starter config
+scripts/              Rollback and release verification helpers
+docs/                 Guides and documentation
+```
 
-## Quick start for readers
+---
 
-1. Install prerequisites: Docker, kubectl, kind or minikube, Node.js 20+, helm, argocd CLI.
-2. Follow [docs/setup.md](docs/setup.md).
-3. Choose one deployment guide:
-   - [docs/deployment-linux.md](docs/deployment-linux.md)
-   - [docs/deployment-windows.md](docs/deployment-windows.md)
-   - [docs/deployment-dockerized.md](docs/deployment-dockerized.md)
-4. Run local app tests:
-   - cd app
-   - npm ci
-   - npm test
-5. Build and run container:
-   - docker build -f docker/Dockerfile -t local/autonomous-release:dev app
-   - docker run -p 8080:8080 local/autonomous-release:dev
-6. Apply Kubernetes base manifests:
-   - kubectl apply -k k8s/overlays/dev
-7. Install ArgoCD and apply the app specs from argocd/.
+## Quick start
 
-## 5-minute demo mode (dev namespace only)
+Requirements: Docker, kubectl, kind, Git running in WSL or Linux.
 
-Use this when you want a very fast first run.
+```bash
+# 1. clone the repo
+git clone https://github.com/code-and-secure/Autonomous-Release-Orchestration-Platform.git
+cd Autonomous-Release-Orchestration-Platform
 
-1. Create local cluster and dev namespace:
-   - kind create cluster --name aro-platform
-   - kubectl create namespace dev
-2. Deploy only dev overlay:
-   - kubectl apply -k k8s/overlays/dev
-3. Verify rollout:
-   - kubectl get pods -n dev
-4. Optional quick check:
-   - sh scripts/verify-release.sh dev app=autonomous-release-app
+# 2. create the cluster
+kind create cluster --name argo-platform
 
-For full flow with ArgoCD, monitoring, and rollback practice, use [docs/deployment-guide.md](docs/deployment-guide.md).
+# 3. install ArgoCD
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s
 
-## Before making this repo public
+# 4. register the apps
+kubectl apply -f argocd/application-dev.yaml
+kubectl apply -f argocd/application-prod.yaml
 
-1. Replace image references in Kubernetes manifests with your own registry path.
-2. Update ArgoCD repoURL fields with your public GitHub repository URL.
-3. Add a short project description and architecture image in this README.
-4. Configure GitHub Secrets for Slack and registry authentication.
-5. Never commit passwords, kubeconfig, or tokens.
+# 5. create image pull secret (replace values with your GitHub username and PAT)
+kubectl create secret docker-registry ghcr-pull-secret \
+  --docker-server=ghcr.io \
+  --docker-username=<github-username> \
+  --docker-password=<github-PAT-with-read:packages> \
+  -n dev
 
-## GHCR and Jenkins setup checklist
+kubectl create secret docker-registry ghcr-pull-secret \
+  --docker-server=ghcr.io \
+  --docker-username=<github-username> \
+  --docker-password=<github-PAT-with-read:packages> \
+  -n prod
 
-1. Create a GitHub personal access token with `write:packages` and `read:packages` scopes.
-2. In Jenkins, add credential `ghcr-creds` (username: GitHub user/org owner, password: PAT).
-3. Ensure Jenkins can read your repository remote URL (`origin`) so `GITHUB_ORG` can be auto-detected.
-4. If auto-detection is not possible, set environment variable `GITHUB_ORG` in Jenkins job configuration.
-5. Update Kubernetes image names to `ghcr.io/<your-org>/autonomous-release-platform:<tag>` for cluster pulls.
+# 6. open the ArgoCD UI
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+
+Open `https://localhost:8080` — username `admin`, password from:
+
+```bash
+kubectl get secret argocd-initial-admin-secret -n argocd \
+  -o jsonpath="{.data.password}" | base64 -d && echo
+```
+
+For the full step-by-step guide with troubleshooting, see [docs/deployment-guide-wsl.md](docs/deployment-guide-wsl.md).
+
+---
+
+## GitHub Actions setup
+
+The CI pipeline uses `GITHUB_TOKEN` — no extra secrets needed for building and pushing images.
+
+One-time setup for GHCR package permissions:
+
+1. Push any commit to `main` to create the package
+2. Go to GitHub → Packages → `autonomous-release-platform` → Package settings
+3. Under **Manage Actions access** → Add your repository with **Write** role
+
+---
+
+## Environments
+
+| Environment | Namespace | Replicas | Overlay |
+|---|---|---|---|
+| dev | `dev` | 1 | `k8s/overlays/dev` |
+| prod | `prod` | 3 | `k8s/overlays/prod` |
+
+---
+
+## Documentation
+
+| File | Description |
+|---|---|
+| [docs/how-it-works.md](docs/how-it-works.md) | What happens on every deployment, end to end |
+| [docs/deployment-guide-wsl.md](docs/deployment-guide-wsl.md) | Full setup guide for WSL and Linux with every command |
+| [docs/learning-path.md](docs/learning-path.md) | Suggested learning stages for this project |
+| [docs/production-readiness-checklist.md](docs/production-readiness-checklist.md) | Checklist before a real production rollout |
+
+---
 
 ## Learning milestones
 
-1. CI: push code, run tests, build image.
-2. CD: update manifests and sync via ArgoCD.
-3. Observability: verify deployment health using Prometheus and Grafana.
-4. Safety: rollout checks, rollback strategy, and Slack notifications.
+1. **CI** — push code, run tests, build and push image automatically
+2. **CD** — update Git manifests, ArgoCD syncs the cluster
+3. **Observability** — verify deployment health with Prometheus and Grafana
+4. **Safety** — rollback strategy using ArgoCD history
 
-## Production readiness
+---
 
-Use [docs/production-readiness-checklist.md](docs/production-readiness-checklist.md) before real production rollout.
-
-## Open source and community
+## Open source
 
 - License: [LICENSE](LICENSE)
-- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - Security policy: [SECURITY.md](SECURITY.md)
-
-## Required secrets and credentials
-
-For GitHub Actions, configure repository secrets:
-
-- REGISTRY_USERNAME
-- REGISTRY_PASSWORD
-- SLACK_WEBHOOK_URL
-
-For Jenkins, configure:
-
-- Credential ID `ghcr-creds` (GitHub username + PAT)
-- Optional environment variable `GITHUB_ORG` (if not inferable from git remote)
-
-For GitHub Container Registry (GHCR), you can use `GITHUB_TOKEN` with `packages: write` permission in GitHub Actions.
