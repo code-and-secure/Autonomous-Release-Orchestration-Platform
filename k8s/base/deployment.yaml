@@ -14,10 +14,12 @@ spec:
       labels:
         app: autonomous-release-app
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: app
           image: ghcr.io/code-and-secure/autonomous-release-platform:dev
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           readinessProbe:
