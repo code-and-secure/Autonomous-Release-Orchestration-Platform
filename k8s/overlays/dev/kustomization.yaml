@@ -5,7 +5,7 @@ resources:
 namePrefix: dev-
 namespace: dev
 images:
-  - name: local/autonomous-release-platform
+  - name: ghcr.io/code-and-secure/autonomous-release-platform
     newTag: dev
 replicas:
   - name: autonomous-release-app

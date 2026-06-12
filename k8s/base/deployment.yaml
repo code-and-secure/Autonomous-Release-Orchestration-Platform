@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: app
-          image: local/autonomous-release-platform:dev
+          image: ghcr.io/code-and-secure/autonomous-release-platform:dev
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

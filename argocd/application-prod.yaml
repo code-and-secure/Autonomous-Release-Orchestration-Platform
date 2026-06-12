@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/example-org/autonomous-release-orchestration-platform.git
+    repoURL: https://github.com/code-and-secure/Autonomous-Release-Orchestration-Platform.git
     targetRevision: main
     path: k8s/overlays/prod
   destination:

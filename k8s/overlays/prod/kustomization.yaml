@@ -5,7 +5,7 @@ resources:
 namePrefix: prod-
 namespace: prod
 images:
-  - name: local/autonomous-release-platform
+  - name: ghcr.io/code-and-secure/autonomous-release-platform
     newTag: prod
 replicas:
   - name: autonomous-release-app
