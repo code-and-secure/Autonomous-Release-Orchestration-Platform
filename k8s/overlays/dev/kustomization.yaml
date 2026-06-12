@@ -6,7 +6,7 @@ namePrefix: dev-
 namespace: dev
 images:
   - name: ghcr.io/code-and-secure/autonomous-release-platform
-    newTag: sha-da81383
+    newTag: sha-b9cc742
 replicas:
   - name: autonomous-release-app
     count: 1
