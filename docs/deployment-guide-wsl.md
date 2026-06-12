@@ -390,6 +390,176 @@ You will see new pods come up and old pods terminate.
 
 ---
 
+## Part 15 — Install Helm
+
+Helm is the package manager for Kubernetes. It is used to install the monitoring stack in one command.
+
+Check if Helm is already installed:
+
+```bash
+helm version
+```
+
+If not installed:
+
+```bash
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+helm version
+```
+
+Expected output:
+
+```
+version.BuildInfo{Version:"v3.xx.x", ...}
+```
+
+---
+
+## Part 16 — Install the monitoring stack
+
+The monitoring stack installs Prometheus, Grafana, and Alertmanager together using a single Helm chart.
+
+Add the Helm repository:
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+```
+
+Install the stack using the config from this repo:
+
+```bash
+helm upgrade --install monitor prometheus-community/kube-prometheus-stack \
+  -n monitoring --create-namespace \
+  -f monitoring/prometheus-values.yaml
+```
+
+Expected output:
+
+```
+Release "monitor" does not exist. Installing it now.
+NAME: monitor
+LAST DEPLOYED: ...
+NAMESPACE: monitoring
+STATUS: deployed
+REVISION: 1
+```
+
+Wait for all pods to be ready (takes 2-3 minutes):
+
+```bash
+kubectl get pods -n monitoring -w
+```
+
+You are waiting for all pods to show `Running`. Press `Ctrl+C` when done.
+
+Expected final state:
+
+```
+NAME                                                   READY   STATUS    RESTARTS
+alertmanager-monitor-kube-prometheus-st-alertmanager-0 2/2     Running   0
+monitor-grafana-xxxxxxxxx-xxxxx                        3/3     Running   0
+monitor-kube-prometheus-st-operator-xxxxxxxxx-xxxxx    1/1     Running   0
+monitor-kube-state-metrics-xxxxxxxxx-xxxxx             1/1     Running   0
+monitor-prometheus-node-exporter-xxxxx                 1/1     Running   0
+prometheus-monitor-kube-prometheus-st-prometheus-0     2/2     Running   0
+```
+
+Verify all are running:
+
+```bash
+kubectl get pods -n monitoring
+```
+
+---
+
+## Part 17 — Open Grafana
+
+Start the port-forward in a dedicated terminal (keep it running):
+
+```bash
+kubectl port-forward svc/monitor-grafana -n monitoring 3000:80
+```
+
+Open in your Windows browser: `http://localhost:3000`
+
+Get the Grafana admin password:
+
+```bash
+kubectl get secret --namespace monitoring monitor-grafana \
+  -o jsonpath="{.data.admin-password}" | base64 -d && echo
+```
+
+Login with:
+- **Username:** `admin`
+- **Password:** output from the command above (default is `admin` if unchanged in prometheus-values.yaml)
+
+---
+
+## Part 18 — Import the release health dashboard
+
+The dashboard JSON is already in the repo at `monitoring/grafana-dashboard-release.json`. It has 13 panels covering pods, CPU, memory, restarts, replicas, and node metrics.
+
+**Steps to import:**
+
+1. In Grafana, click the **+** icon in the top-right → **Import dashboard**
+2. Click **Upload JSON file**
+3. Navigate to your repo folder and select `monitoring/grafana-dashboard-release.json`
+4. Click **Import**
+
+**What each panel shows:**
+
+| Panel | Type | What it tracks |
+|---|---|---|
+| Running Pods (dev + prod) | Stat | Total pods in Running phase across both namespaces |
+| Dev Pods Running | Stat | Pods running in dev namespace only |
+| Prod Pods Running | Stat | Pods running in prod namespace only |
+| Total Container Restarts | Stat | Cumulative restart count — goes red at 5+ |
+| CPU Usage by Namespace | Timeseries | CPU % consumed by dev and prod containers |
+| Memory Usage by Namespace | Timeseries | Memory bytes used by dev and prod containers |
+| Pod Restarts Over Time | Timeseries | Restart rate per pod — spikes indicate crash loops |
+| HTTP Success Rate | Timeseries | % of 2xx responses (requires app to expose metrics) |
+| Dev — Available vs Desired | Gauge | % of desired replicas that are available in dev |
+| Prod — Available vs Desired | Gauge | % of desired replicas that are available in prod |
+| Pod Status Breakdown | Table | All pods with namespace, name, and phase colour coded |
+| Node CPU Usage | Timeseries | Overall node CPU % (not just app containers) |
+| Node Memory Available | Timeseries | Node-level free vs total memory |
+
+**Colour thresholds:**
+- Green = healthy
+- Yellow = degraded / warning
+- Red = critical
+
+---
+
+## Part 19 — Open Prometheus (optional)
+
+Prometheus is the data source behind Grafana. You can query metrics directly here.
+
+```bash
+kubectl port-forward svc/monitor-kube-prometheus-st-prometheus -n monitoring 9090:9090
+```
+
+Open: `http://localhost:9090`
+
+Useful queries to try:
+
+```promql
+# all running pods in dev and prod
+kube_pod_status_phase{namespace=~"dev|prod", phase="Running"}
+
+# container restart count
+kube_pod_container_status_restarts_total{namespace=~"dev|prod"}
+
+# available replicas in prod
+kube_deployment_status_replicas_available{namespace="prod"}
+
+# node CPU usage percentage
+(1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) * 100
+```
+
+---
+
 ## Reference Commands
 
 ### Pods and deployments
@@ -444,6 +614,43 @@ kind delete cluster --name argo-platform
 
 # recreate it
 kind create cluster --name argo-platform
+```
+
+### Monitoring
+
+```bash
+# check all monitoring pods
+kubectl get pods -n monitoring
+
+# watch monitoring pods in real time
+kubectl get pods -n monitoring -w
+
+# open Grafana (run in a dedicated terminal)
+kubectl port-forward svc/monitor-grafana -n monitoring 3000:80
+
+# open Prometheus (run in a dedicated terminal)
+kubectl port-forward svc/monitor-kube-prometheus-st-prometheus -n monitoring 9090:9090
+
+# open Alertmanager (run in a dedicated terminal)
+kubectl port-forward svc/monitor-kube-prometheus-st-alertmanager -n monitoring 9093:9093
+
+# get Grafana admin password
+kubectl get secret --namespace monitoring monitor-grafana \
+  -o jsonpath="{.data.admin-password}" | base64 -d && echo
+
+# check Helm releases
+helm list -n monitoring
+
+# upgrade monitoring stack after changes to prometheus-values.yaml
+helm upgrade --install monitor prometheus-community/kube-prometheus-stack \
+  -n monitoring \
+  -f monitoring/prometheus-values.yaml
+
+# uninstall monitoring stack completely
+helm uninstall monitor -n monitoring
+
+# check Prometheus targets (what it is scraping)
+# open http://localhost:9090/targets after port-forwarding Prometheus
 ```
 
 ### Secrets
@@ -632,6 +839,101 @@ If `/usr/local/bin` is not in `$PATH`, add it:
 echo 'export PATH=$PATH:/usr/local/bin' >> ~/.bashrc
 source ~/.bashrc
 ```
+
+---
+
+### Monitoring pods stuck on `Pending` or `ContainerCreating`
+
+```bash
+kubectl get pods -n monitoring
+# NAME                          READY   STATUS              RESTARTS
+# monitor-grafana-xxx           0/3     ContainerCreating   0
+```
+
+**Cause:** Images are still being pulled from Docker Hub. The kube-prometheus-stack pulls many images on first install.
+
+**Fix:** Wait 3-5 minutes. Check progress:
+
+```bash
+kubectl describe pod <pod-name> -n monitoring | grep -A5 "Events:"
+```
+
+If a pod is stuck on `Pending` with no events, the node may be out of resources:
+
+```bash
+kubectl describe node argo-platform-control-plane | grep -A10 "Allocated resources"
+```
+
+---
+
+### Grafana port-forward works but browser shows blank page
+
+**Cause:** Grafana is still initialising even though the pod shows `Running`.
+
+**Fix:** Wait 30 seconds and refresh. If still blank, check Grafana logs:
+
+```bash
+kubectl logs -n monitoring -l app.kubernetes.io/name=grafana -c grafana
+```
+
+---
+
+### Grafana dashboard shows `No data` on all panels
+
+**Cause:** Either Prometheus has not scraped the metrics yet, or the namespace filter `dev|prod` does not match anything.
+
+**Fix — check Prometheus is scraping your namespaces:**
+
+```bash
+kubectl port-forward svc/monitor-kube-prometheus-st-prometheus -n monitoring 9090:9090
+```
+
+Open `http://localhost:9090/targets` and confirm targets are green.
+
+**Fix — verify metrics exist in Prometheus:**
+
+Go to `http://localhost:9090`, enter this query and click Execute:
+
+```promql
+kube_pod_status_phase{namespace=~"dev|prod"}
+```
+
+If no results, kube-state-metrics may not be running:
+
+```bash
+kubectl get pods -n monitoring | grep kube-state-metrics
+```
+
+---
+
+### `helm: command not found`
+
+```
+bash: helm: command not found
+```
+
+**Fix:** Install Helm (Part 15 above):
+
+```bash
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
+
+---
+
+### `helm upgrade` fails with `release not found` or repo errors
+
+```
+Error: repo prometheus-community not found
+```
+
+**Fix:** Add the repo first:
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+```
+
+Then re-run the install command.
 
 ---
 
