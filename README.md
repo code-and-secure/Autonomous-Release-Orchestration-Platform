@@ -26,14 +26,27 @@ For a detailed explanation of every step, see [docs/how-it-works.md](docs/how-it
 
 ```mermaid
 flowchart TD
-  A[Developer pushes to main] --> B[GitHub Actions]
-  B --> C[npm test]
-  C --> D[docker build + push to GHCR]
-  D --> E[Update kustomization.yaml image tag in Git]
-  E --> F[ArgoCD detects Git change]
-  F --> G[kubectl apply via Kustomize]
-  G --> H[Kubernetes rolling update]
-  H --> I[Healthy pods running in dev + prod]
+    A([Developer pushes to main]) --> B
+
+    subgraph CI [GitHub Actions]
+        B[Run npm test] --> C[Build Docker image]
+        C --> D[Push image to GHCR]
+        D --> E[Patch image tag in kustomization.yaml]
+        E --> F[Commit and push manifest back to Git]
+    end
+
+    subgraph CD [ArgoCD]
+        F --> G[Detect new commit on main]
+        G --> H[Sync k8s/overlays/dev]
+        G --> I[Sync k8s/overlays/prod]
+    end
+
+    subgraph K8S [Kubernetes]
+        H --> J[Rolling update in dev namespace]
+        I --> K[Rolling update in prod namespace]
+        J --> L([Healthy pods running])
+        K --> L
+    end
 ```
 
 ---
